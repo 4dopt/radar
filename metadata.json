@@ -1,0 +1,6 @@
+{
+  "name": "MatchDay Radar: Harrow & Wembley Matchday Hub",
+  "description": "Live matchday pub telemetry and screen finder for Harrow & Wembley corridor (HA1–HA9) with verified sound status and screen counts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

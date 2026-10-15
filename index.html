@@ -1,0 +1,1651 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Radar: Harrow & Wembley Matchday Hub</title>
+    <meta name="description" content="Every sport. One place. Live matchday pub telemetry and screen finder for Harrow & Wembley corridor (HA1–HA9) with verified sound status and big screens." />
+    <meta name="theme-color" content="#0D111D" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta property="og:title" content="Radar: Harrow & Wembley Matchday Hub" />
+    <meta property="og:description" content="Every match. Screened live with confirmed sound across Harrow & Wembley." />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              spotviLime: '#D8FD38',       // The exact vibrant lime green in the image
+              spotviLimeDark: '#B4DA18',
+              spotviDark: '#0D111D',       // Sleek midnight dark base
+              spotviSurface: '#151C2C',    // Card background
+              spotviSurfaceHover: '#1D263B',
+              spotviCard: '#182033',
+              spotviBorder: 'rgba(255, 255, 255, 0.08)',
+              spotviRed: '#EF4444',
+              radarGreen: '#00E676',
+              radarAmber: '#F59E0B'
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace']
+            },
+            borderRadius: {
+              '2.5xl': '20px',
+              '3xl': '24px',
+              '4xl': '32px'
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+      /* Mobile App Shell & Smooth Scrolling */
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+      }
+      
+      html, body {
+        background-color: #0D111D;
+        color: #F8FAFC;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Native scrollbar hiding for horizontal carousels */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Hero Graphic Brush Stroke effect */
+      .lime-brush-bg {
+        background: radial-gradient(circle at 85% 30%, rgba(216, 253, 56, 0.28) 0%, rgba(216, 253, 56, 0.05) 50%, transparent 70%);
+      }
+
+      /* Radar pulse pins */
+      .radar-marker-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .radar-pulse-ring {
+        position: absolute;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background-color: rgba(216, 253, 56, 0.35);
+        animation: radarPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+      }
+      .radar-pin-dot {
+        position: relative;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 0 14px rgba(216, 253, 56, 0.9), 0 2px 6px rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: bold;
+        color: #000;
+        background-color: #D8FD38;
+      }
+      .radar-pin-dot.amber {
+        background-color: #F59E0B;
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.8), 0 2px 6px rgba(0,0,0,0.8);
+      }
+
+      @keyframes radarPing {
+        0% { transform: scale(0.6); opacity: 1; }
+        100% { transform: scale(2.6); opacity: 0; }
+      }
+
+      /* Leaflet dark styling */
+      .leaflet-container {
+        background: #0D111D !important;
+        font-family: inherit;
+      }
+      .leaflet-popup-content-wrapper {
+        background: rgba(21, 28, 44, 0.96) !important;
+        color: #F8FAFC !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 18px !important;
+        box-shadow: 0 20px 45px rgba(0,0,0,0.8) !important;
+        backdrop-filter: blur(16px);
+      }
+      .leaflet-popup-tip {
+        background: rgba(21, 28, 44, 0.96) !important;
+      }
+
+      /* Snap carousel */
+      .snap-x-mandatory {
+        scroll-snap-type: x mandatory;
+      }
+      .snap-card {
+        scroll-snap-align: start;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col antialiased selection:bg-spotviLime selection:text-black">
+
+    <!-- SIMULATED MOBILE DEVICE TOP BAR (Time, WiFi, Battery) -->
+    <div class="px-6 pt-2 pb-1 flex items-center justify-between text-xs text-slate-300 font-semibold tracking-tight z-50">
+      <span id="statusBarTime">9:41</span>
+      
+      <!-- Dynamic Island pill representation -->
+      <div class="w-24 h-4.5 bg-black rounded-full mx-auto hidden sm:block shadow-inner"></div>
+
+      <div class="flex items-center gap-1.5 text-slate-300">
+        <i data-lucide="signal" class="w-3.5 h-3.5"></i>
+        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <i data-lucide="battery-charging" class="w-4 h-4 text-spotviLime"></i>
+      </div>
+    </div>
+
+    <!-- MAIN APP BAR (Exact match to Spotvi header) -->
+    <header class="sticky top-0 z-40 bg-[#0D111D]/90 backdrop-blur-xl border-b border-white/5 px-4 sm:px-6 py-2.5">
+      <div class="max-w-md md:max-w-4xl mx-auto flex items-center justify-between">
+        
+        <!-- Left: Hamburger Menu & Spotvi Wordmark -->
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebarMenu()" class="p-1.5 -ml-1 text-slate-200 hover:text-white active:scale-95 transition" title="Menu">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+          
+          <div class="flex items-center gap-1.5">
+            <span class="font-extrabold text-2xl tracking-tighter text-white lowercase">radar</span>
+            <span class="w-2 h-2 rounded-full bg-spotviLime -mb-2"></span>
+            <!-- Sector badge -->
+            <button onclick="openLocationModal()" class="ml-2 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono font-semibold text-slate-300 hover:text-spotviLime flex items-center gap-1">
+              <span id="currentHubLabel">HA1–HA9</span>
+              <i data-lucide="chevron-down" class="w-2.5 h-2.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Search & Notifications Bell -->
+        <div class="flex items-center gap-1.5">
+          <button onclick="focusSearch()" class="p-2 rounded-full text-slate-200 hover:text-white active:scale-90 transition" title="Search">
+            <i data-lucide="search" class="w-5 h-5"></i>
+          </button>
+          <button onclick="openNotificationsModal()" class="p-2 rounded-full text-slate-200 hover:text-white active:scale-90 transition relative" title="Notifications">
+            <i data-lucide="bell" class="w-5 h-5"></i>
+            <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-spotviLime"></span>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- EXPANDABLE IN-APP SEARCH INPUT -->
+    <div id="searchBarWrapper" class="px-4 py-2 bg-[#0D111D] border-b border-white/5 max-w-md md:max-w-4xl mx-auto w-full hidden">
+      <div class="relative w-full">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+        <input 
+          type="text" 
+          id="globalSearchInput" 
+          placeholder="Search team, pub, screening, or street..." 
+          class="w-full pl-9 pr-8 py-2 rounded-xl bg-spotviSurface border border-white/10 text-xs sm:text-sm text-white placeholder-slate-400 focus:border-spotviLime focus:ring-1 focus:ring-spotviLime outline-none"
+          oninput="handleSearch(this.value)"
+        />
+        <button onclick="clearSearch()" id="clearSearchBtn" class="absolute right-3 top-2.5 text-slate-400 hover:text-white hidden">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN SCROLLABLE APP BODY -->
+    <main class="flex-1 w-full max-w-md md:max-w-4xl mx-auto pb-28">
+
+      <!-- ========================================================= -->
+      <!-- TAB 1: SPOTVI HOME FEED (MATCHES IMAGE DESIGN) -->
+      <!-- ========================================================= -->
+      <div id="view-home" class="flex flex-col gap-5 pt-3">
+        
+        <!-- 1. HERO BANNER: "EVERY SPORT. ONE PLACE." -->
+        <section class="px-4">
+          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121826] via-[#161F33] to-[#0D1322] border border-white/10 p-5 shadow-2xl lime-brush-bg">
+            
+            <!-- Graphic Brush Strokes in background -->
+            <div class="absolute -right-12 -top-12 w-48 h-48 bg-spotviLime/15 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div class="relative z-10 grid grid-cols-12 items-center gap-2 sm:gap-4">
+              <!-- Left Copy (7 cols) -->
+              <div class="col-span-7 sm:col-span-7 space-y-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-spotviLime/20 text-spotviLime border border-spotviLime/30 text-[10px] font-mono font-bold uppercase tracking-wider shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-spotviLime animate-ping"></span>
+                  <span>MATCHDAY RADAR</span>
+                </span>
+                <h2 class="text-xl sm:text-3xl font-extrabold uppercase tracking-tight text-white leading-[1.08]">
+                  EVERY SPORT.<br/><span class="text-white">ONE PLACE.</span>
+                </h2>
+                <p class="text-slate-300 text-[11px] sm:text-xs font-medium leading-relaxed">
+                  Live sports & verified pub audio. Anytime, anywhere in Harrow & Wembley.
+                </p>
+
+                <!-- Single Action Button (Manager Bot button removed) -->
+                <div class="pt-2">
+                  <button onclick="switchTab('explore')" class="px-4 py-2 rounded-full bg-spotviLime hover:bg-spotviLimeDark active:scale-95 text-black font-extrabold text-xs shadow-lg flex items-center gap-1.5 transition">
+                    <i data-lucide="radio" class="w-4 h-4"></i>
+                    <span>Find Screens</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Right: 100% Contained Photorealistic Football Visual with Organic Transparent Edges (Never overflows slider) -->
+              <div class="col-span-5 sm:col-span-5 flex items-center justify-end relative select-none pointer-events-none pr-1">
+                <div class="relative w-28 h-32 sm:w-36 sm:h-40 flex items-center justify-center">
+                  
+                  <!-- Dynamic Spotvi Electric Lime Brush Strokes (Contained strictly inside bounds) -->
+                  <svg class="absolute inset-0 w-full h-full text-spotviLime -rotate-6 z-0" viewBox="0 0 160 160" fill="none">
+                    <!-- Top diagonal brush sweep -->
+                    <path d="M12 65 C38 32 95 20 148 40 C156 44 142 66 118 70 C88 78 45 85 12 65 Z" fill="#D8FD38" fill-opacity="0.95"/>
+                    <!-- Lower speed brush streak -->
+                    <path d="M28 108 C65 78 122 68 152 92 C158 97 138 116 118 118 C88 124 50 126 28 108 Z" fill="#D8FD38" fill-opacity="0.8"/>
+                    <!-- Dynamic splatters -->
+                    <circle cx="118" cy="25" r="3" fill="#D8FD38"/>
+                    <circle cx="148" cy="55" r="2.5" fill="#D8FD38"/>
+                    <circle cx="20" cy="85" r="2.5" fill="#D8FD38"/>
+                  </svg>
+
+                  <!-- Photorealistic Football Champion Visual (Feathered Radial Fade: 100% No Square Box, 100% Within Slider) -->
+                  <div class="relative z-10 w-24 h-28 sm:w-32 sm:h-36 rounded-full overflow-hidden flex items-center justify-center" style="-webkit-mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 50%, rgba(0,0,0,0.8) 70%, transparent 95%); mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 50%, rgba(0,0,0,0.8) 70%, transparent 95%);">
+                    <img 
+                      src="https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=500&q=80" 
+                      alt="Football Matchday Champion" 
+                      class="w-full h-full object-cover object-center filter brightness-110 contrast-115"
+                      onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=500&q=80';"
+                    />
+                  </div>
+
+                  <!-- Floating Matchday Live Chip -->
+                  <div class="absolute -bottom-1 right-0 z-20 px-2 py-0.5 rounded-full bg-black/90 border border-spotviLime/60 shadow-lg flex items-center gap-1 text-[9px] font-mono text-spotviLime font-bold">
+                    <span>⚽</span>
+                    <span>LIVE</span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 2. SPORTS CATEGORY PILL CAROUSEL (Authentic sports icons) -->
+        <section class="px-4">
+          <div class="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+            
+            <!-- "All Sports" (Active pill in image: Black with lime accent) -->
+            <button onclick="filterCategory('all')" id="cat-all" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-black border-2 border-spotviLime/80 group-hover:border-spotviLime flex items-center justify-center text-white shadow-lg p-3">
+                <svg class="w-6 h-6 text-spotviLime" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                  <path d="M2 12h20"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-bold text-white">All Sports</span>
+            </button>
+
+            <!-- Football (Authentic 32-panel soccer ball SVG) -->
+            <button onclick="filterCategory('football')" id="cat-football" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-spotviSurface border border-white/10 group-hover:border-spotviLime flex items-center justify-center text-slate-300 group-hover:text-spotviLime shadow p-3">
+                <svg class="w-6 h-6 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polygon points="12 8 8.5 10.5 9.8 14.5 14.2 14.5 15.5 10.5" fill="currentColor" fill-opacity="0.3"/>
+                  <line x1="12" y1="2" x2="12" y2="8"/>
+                  <line x1="4" y1="7" x2="8.5" y2="10.5"/>
+                  <line x1="20" y1="7" x2="15.5" y2="10.5"/>
+                  <line x1="6" y1="18" x2="9.8" y2="14.5"/>
+                  <line x1="18" y1="18" x2="14.2" y2="14.5"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-medium text-slate-400 group-hover:text-white">Football</span>
+            </button>
+
+            <!-- Basketball (Authentic 8-panel basketball seams SVG) -->
+            <button onclick="filterCategory('basketball')" id="cat-basketball" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-spotviSurface border border-white/10 group-hover:border-spotviLime flex items-center justify-center text-slate-300 group-hover:text-spotviLime shadow p-3">
+                <svg class="w-6 h-6 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <line x1="12" y1="2" x2="12" y2="22"/>
+                  <path d="M5 5c4.5 3 4.5 11 0 14"/>
+                  <path d="M19 5c-4.5 3-4.5 11 0 14"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-medium text-slate-400 group-hover:text-white">Basketball</span>
+            </button>
+
+            <!-- Tennis (Authentic Tennis Racket & Ball SVG) -->
+            <button onclick="filterCategory('tennis')" id="cat-tennis" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-spotviSurface border border-white/10 group-hover:border-spotviLime flex items-center justify-center text-slate-300 group-hover:text-spotviLime shadow p-3">
+                <svg class="w-6 h-6 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="14" cy="10" r="6"/>
+                  <line x1="9.5" y1="14.5" x2="4" y2="20"/>
+                  <line x1="2.5" y1="18.5" x2="5.5" y2="21.5"/>
+                  <line x1="10" y1="8" x2="18" y2="8"/>
+                  <line x1="10" y1="12" x2="18" y2="12"/>
+                  <line x1="12" y1="6" x2="12" y2="14"/>
+                  <line x1="16" y1="6" x2="16" y2="14"/>
+                  <circle cx="5" cy="5" r="2.5" fill="currentColor" fill-opacity="0.3"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-medium text-slate-400 group-hover:text-white">Tennis</span>
+            </button>
+
+            <!-- Golf (Authentic Flag on Green & Ball on Tee SVG) -->
+            <button onclick="filterCategory('golf')" id="cat-golf" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-spotviSurface border border-white/10 group-hover:border-spotviLime flex items-center justify-center text-slate-300 group-hover:text-spotviLime shadow p-3">
+                <svg class="w-6 h-6 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3v17"/>
+                  <path d="M12 4l7 3.5-7 3.5V4z" fill="currentColor" fill-opacity="0.3"/>
+                  <path d="M5 20c3.5-1 10.5-1 14 0"/>
+                  <circle cx="7" cy="18" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-medium text-slate-400 group-hover:text-white">Golf</span>
+            </button>
+
+            <!-- More (Clean three dots in capsule SVG) -->
+            <button onclick="openCategorySheet()" class="cat-pill shrink-0 flex flex-col items-center gap-1.5 group active:scale-95 transition">
+              <div class="w-13 h-13 rounded-2xl bg-spotviSurface border border-white/10 group-hover:border-spotviLime flex items-center justify-center text-slate-300 group-hover:text-spotviLime shadow p-3">
+                <svg class="w-6 h-6 transition" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="5" cy="12" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="19" cy="12" r="2"/>
+                </svg>
+              </div>
+              <span class="text-[11px] font-medium text-slate-400 group-hover:text-white">More</span>
+            </button>
+
+          </div>
+        </section>
+
+        <!-- 3. "LIVE NOW" SECTION (Horizontal Snap Cards with Accurate Logos) -->
+        <section class="px-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <span>Live Now</span>
+              <span class="w-2 h-2 rounded-full bg-spotviRed animate-ping"></span>
+            </h3>
+            <button onclick="switchTab('schedule')" class="text-xs font-semibold text-slate-400 hover:text-spotviLime transition flex items-center gap-0.5">
+              <span>See All</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Horizontal Carousel of Live Cards -->
+          <div class="flex items-center gap-3.5 overflow-x-auto no-scrollbar snap-x-mandatory pb-1">
+            
+            <!-- CARD 1: MAN CITY VS ARSENAL (Exact match from image!) -->
+            <div onclick="openMatchModal('arsenal-mancity')" class="snap-card shrink-0 w-[240px] sm:w-[260px] rounded-3xl bg-gradient-to-b from-[#1C253B] to-[#141B2D] border border-white/10 hover:border-spotviLime/50 p-4 shadow-xl active:scale-98 transition flex flex-col justify-between gap-3 cursor-pointer group">
+              <!-- Top Row: League & Red LIVE badge -->
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-300">Premier League</span>
+                <span class="px-2 py-0.5 rounded-full bg-spotviRed text-white text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                  <span>LIVE 68'</span>
+                </span>
+              </div>
+
+              <!-- Accurate Football Team Crests Side-by-Side -->
+              <div class="flex items-center justify-around py-1">
+                <!-- Manchester City FC Crest -->
+                <div class="flex flex-col items-center gap-1.5">
+                  <div class="w-14 h-14 rounded-full bg-[#1C2C4E]/60 p-2 flex items-center justify-center shadow-md border border-white/10 group-hover:scale-105 transition">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg" 
+                      alt="Manchester City Crest" 
+                      class="w-11 h-11 object-contain drop-shadow"
+                      onerror="this.onerror=null; this.src='https://assets.stickpng.com/images/580b57fcd9996e24bc43c4e5.png';"
+                    />
+                  </div>
+                  <span class="text-[10px] font-mono text-slate-300 font-semibold">1</span>
+                </div>
+
+                <div class="flex flex-col items-center gap-0.5">
+                  <span class="text-xs font-mono font-bold text-spotviLime">VS</span>
+                  <span class="text-[9px] font-mono text-slate-400">Sky Sports</span>
+                </div>
+
+                <!-- Arsenal FC Crest -->
+                <div class="flex flex-col items-center gap-1.5">
+                  <div class="w-14 h-14 rounded-full bg-[#2B1B22]/60 p-2 flex items-center justify-center shadow-md border border-white/10 group-hover:scale-105 transition">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg" 
+                      alt="Arsenal FC Crest" 
+                      class="w-11 h-11 object-contain drop-shadow"
+                      onerror="this.onerror=null; this.src='https://assets.stickpng.com/images/580b57fcd9996e24bc43c4df.png';"
+                    />
+                  </div>
+                  <span class="text-[10px] font-mono text-slate-300 font-semibold">1</span>
+                </div>
+              </div>
+
+              <!-- Match Title & Pub Screening Stats -->
+              <div class="pt-1 border-t border-white/5 flex items-center justify-between">
+                <div>
+                  <h4 class="font-bold text-xs text-white">Man City vs Arsenal</h4>
+                  <p class="text-[10px] text-spotviLime font-semibold">🔊 5 HA Pubs Sound ON</p>
+                </div>
+                <div class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD 2: LAKERS VS CELTICS (From image!) -->
+            <div onclick="openMatchModal('lakers-celtics')" class="snap-card shrink-0 w-[240px] sm:w-[260px] rounded-3xl bg-gradient-to-b from-[#1C253B] to-[#141B2D] border border-white/10 hover:border-spotviLime/50 p-4 shadow-xl active:scale-98 transition flex flex-col justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-300">NBA Basketball</span>
+                <span class="px-2 py-0.5 rounded-full bg-spotviRed text-white text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                  <span>LIVE Q3</span>
+                </span>
+              </div>
+
+              <!-- Accurate NBA Logos -->
+              <div class="flex items-center justify-around py-1">
+                <!-- LA Lakers Logo -->
+                <div class="flex flex-col items-center gap-1.5">
+                  <div class="w-14 h-14 rounded-full bg-[#271E3A]/60 p-2 flex items-center justify-center shadow-md border border-white/10 group-hover:scale-105 transition">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Los_Angeles_Lakers_logo.svg" 
+                      alt="Los Angeles Lakers" 
+                      class="w-11 h-11 object-contain drop-shadow"
+                    />
+                  </div>
+                  <span class="text-[10px] font-mono text-slate-300 font-semibold">78</span>
+                </div>
+
+                <div class="flex flex-col items-center gap-0.5">
+                  <span class="text-xs font-mono font-bold text-spotviLime">VS</span>
+                  <span class="text-[9px] font-mono text-slate-400">TNT Sports</span>
+                </div>
+
+                <!-- Boston Celtics Logo -->
+                <div class="flex flex-col items-center gap-1.5">
+                  <div class="w-14 h-14 rounded-full bg-[#182B1E]/60 p-2 flex items-center justify-center shadow-md border border-white/10 group-hover:scale-105 transition">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg" 
+                      alt="Boston Celtics" 
+                      class="w-11 h-11 object-contain drop-shadow"
+                    />
+                  </div>
+                  <span class="text-[10px] font-mono text-slate-300 font-semibold">82</span>
+                </div>
+              </div>
+
+              <div class="pt-1 border-t border-white/5 flex items-center justify-between">
+                <div>
+                  <h4 class="font-bold text-xs text-white">Lakers vs Celtics</h4>
+                  <p class="text-[10px] text-spotviLime font-semibold">🔊 Stadium Sports Bar ON</p>
+                </div>
+                <div class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD 3: WIMBLEDON QUARTER FINALS (From image!) -->
+            <div onclick="openMatchModal('wimbledon-live')" class="snap-card shrink-0 w-[240px] sm:w-[260px] rounded-3xl bg-gradient-to-b from-[#1C253B] to-[#141B2D] border border-white/10 hover:border-spotviLime/50 p-4 shadow-xl active:scale-98 transition flex flex-col justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-300">Wimbledon Tennis</span>
+                <span class="px-2 py-0.5 rounded-full bg-spotviRed text-white text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                  <span>LIVE SET 4</span>
+                </span>
+              </div>
+
+              <!-- Tennis photo visual -->
+              <div class="relative h-18 rounded-2xl overflow-hidden my-0.5">
+                <img 
+                  src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=400&q=80" 
+                  alt="Tennis Court" 
+                  class="w-full h-full object-cover filter brightness-90 group-hover:scale-105 transition"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2">
+                  <span class="text-[10px] font-bold text-white">Centre Court • BBC One</span>
+                </div>
+              </div>
+
+              <div class="pt-1 border-t border-white/5 flex items-center justify-between">
+                <div>
+                  <h4 class="font-bold text-xs text-white truncate">Wimbledon Quarter Finals</h4>
+                  <p class="text-[10px] text-spotviLime font-semibold">🌿 3 Garden Screens ON</p>
+                </div>
+                <div class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 4. "UPCOMING" SECTION (Accurate Football Logos: Real Madrid, Barcelona, Chelsea, Liverpool) -->
+        <section class="px-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white tracking-tight">Upcoming</h3>
+            <button onclick="switchTab('schedule')" class="text-xs font-semibold text-slate-400 hover:text-spotviLime transition flex items-center gap-0.5">
+              <span>See All</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            <!-- UPCOMING 1: REAL MADRID VS BARCELONA (EL CLÁSICO - Accurate Logos!) -->
+            <div onclick="openMatchModal('real-barcelona')" class="rounded-3xl bg-spotviCard border border-white/10 hover:border-spotviLime/40 p-4 shadow-lg active:scale-98 transition flex items-center justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center gap-3">
+                
+                <!-- Accurate Crests Column -->
+                <div class="flex items-center -space-x-3 shrink-0">
+                  <!-- Real Madrid Crest -->
+                  <div class="w-11 h-11 rounded-full bg-[#18233C] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg" 
+                      alt="Real Madrid CF Crest" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                  <!-- FC Barcelona Crest -->
+                  <div class="w-11 h-11 rounded-full bg-[#291823] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg" 
+                      alt="FC Barcelona Crest" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-bold text-xs sm:text-sm text-white group-hover:text-spotviLime transition">Real Madrid vs Barcelona</h4>
+                  <p class="text-[11px] text-slate-400">La Liga • Tomorrow, 8:00 PM</p>
+                  <span class="text-[10px] font-mono text-spotviLime font-semibold">⚡ Verified by The Torch & Junction</span>
+                </div>
+              </div>
+
+              <div class="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition shrink-0">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </div>
+            </div>
+
+            <!-- UPCOMING 2: CHELSEA VS LIVERPOOL (Accurate Premier League Crests!) -->
+            <div onclick="openMatchModal('chelsea-liverpool')" class="rounded-3xl bg-spotviCard border border-white/10 hover:border-spotviLime/40 p-4 shadow-lg active:scale-98 transition flex items-center justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center gap-3">
+                
+                <div class="flex items-center -space-x-3 shrink-0">
+                  <!-- Chelsea FC Crest -->
+                  <div class="w-11 h-11 rounded-full bg-[#162544] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg" 
+                      alt="Chelsea FC Crest" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                  <!-- Liverpool FC Crest -->
+                  <div class="w-11 h-11 rounded-full bg-[#351A20] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg" 
+                      alt="Liverpool FC Crest" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-bold text-xs sm:text-sm text-white group-hover:text-spotviLime transition">Chelsea vs Liverpool</h4>
+                  <p class="text-[11px] text-slate-400">Premier League • Today, 5:30 PM</p>
+                  <span class="text-[10px] font-mono text-spotviLime font-semibold">⚡ 6 HA Pubs Screening Live</span>
+                </div>
+              </div>
+
+              <div class="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition shrink-0">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </div>
+            </div>
+
+            <!-- UPCOMING 3: DJOKOVIC N. VS ALCARAZ C. (From image!) -->
+            <div onclick="openMatchModal('djokovic-alcaraz')" class="rounded-3xl bg-spotviCard border border-white/10 hover:border-spotviLime/40 p-4 shadow-lg active:scale-98 transition flex items-center justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center gap-3">
+                <div class="flex items-center -space-x-3 shrink-0">
+                  <div class="w-11 h-11 rounded-full bg-[#19273D] border-2 border-[#121A2E] overflow-hidden shadow">
+                    <img 
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" 
+                      alt="Djokovic" 
+                      class="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div class="w-11 h-11 rounded-full bg-[#203126] border-2 border-[#121A2E] overflow-hidden shadow">
+                    <img 
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" 
+                      alt="Alcaraz" 
+                      class="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-bold text-xs sm:text-sm text-white group-hover:text-spotviLime transition">Djokovic N. vs Alcaraz C.</h4>
+                  <p class="text-[11px] text-slate-400">Wimbledon • Tomorrow, 2:00 PM</p>
+                  <span class="text-[10px] font-mono text-slate-400">BBC Sport Main Event</span>
+                </div>
+              </div>
+
+              <div class="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition shrink-0">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </div>
+            </div>
+
+            <!-- UPCOMING 4: REAL MADRID VS BAYERN MUNICH (Champions League) -->
+            <div onclick="openMatchModal('real-bayern')" class="rounded-3xl bg-spotviCard border border-white/10 hover:border-spotviLime/40 p-4 shadow-lg active:scale-98 transition flex items-center justify-between gap-3 cursor-pointer group">
+              <div class="flex items-center gap-3">
+                <div class="flex items-center -space-x-3 shrink-0">
+                  <div class="w-11 h-11 rounded-full bg-[#18233C] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg" 
+                      alt="Real Madrid" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                  <div class="w-11 h-11 rounded-full bg-[#36151D] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg" 
+                      alt="FC Bayern Munich" 
+                      class="w-8 h-8 object-contain drop-shadow"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-bold text-xs sm:text-sm text-white group-hover:text-spotviLime transition">Real Madrid vs Bayern Munich</h4>
+                  <p class="text-[11px] text-slate-400">Champions League • Tonight, 8:00 PM</p>
+                  <span class="text-[10px] font-mono text-spotviLime font-semibold">⚡ Big Projector Verified at Stadium Sports Bar</span>
+                </div>
+              </div>
+
+              <div class="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-300 group-hover:bg-spotviLime group-hover:text-black transition shrink-0">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 5. VERIFIED HARROW & WEMBLEY PUBS FEED PREVIEW -->
+        <section class="px-4 space-y-3 pt-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Verified Matchday Pubs</span>
+                <span class="px-2 py-0.5 rounded-full bg-spotviLime/15 text-spotviLime border border-spotviLime/30 text-[10px] font-mono font-bold">HA1–HA9</span>
+              </h3>
+              <p class="text-xs text-slate-400">Guaranteed commentary & large screens near you</p>
+            </div>
+            <button onclick="switchTab('explore')" class="text-xs font-bold text-spotviLime hover:underline flex items-center gap-1">
+              <span>View Map</span>
+              <i data-lucide="map" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Dynamic List of Venue Cards -->
+          <div id="homeVenueFeed" class="space-y-3">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- TAB 2: SCHEDULE VIEW (FIXTURES CALENDAR) -->
+      <!-- ========================================================= -->
+      <div id="view-schedule" class="hidden px-4 pt-3 space-y-4">
+        <div class="p-4 rounded-3xl bg-spotviSurface border border-white/10 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">Matchday Schedule</h2>
+            <p class="text-xs text-slate-400">Live TV Guide & Harrow / Wembley Pub Broadcasts</p>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-spotviLime/20 text-spotviLime font-mono text-xs font-bold">LIVE TELEMETRY</span>
+        </div>
+
+        <div id="scheduleFullList" class="space-y-3">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- TAB 3: EXPLORE / RADAR MAP VIEW (Full Map + Venue Puck Carousel) -->
+      <!-- ========================================================= -->
+      <div id="view-explore" class="hidden relative h-[calc(100vh-140px)] flex flex-col">
+        
+        <!-- Floating Filter Chips on Map -->
+        <div class="absolute top-3 left-3 right-3 z-[400] flex items-center justify-between pointer-events-none">
+          <div class="pointer-events-auto bg-spotviDark/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15 text-[11px] font-mono flex items-center gap-2 shadow-xl">
+            <span class="w-2 h-2 rounded-full bg-spotviLime animate-pulse"></span>
+            <span class="text-white font-bold">RADAR TELEMETRY</span>
+            <span class="text-slate-400">HA1–HA9</span>
+          </div>
+
+          <div class="pointer-events-auto flex items-center gap-1.5 bg-spotviDark/90 backdrop-blur-md p-1 rounded-full border border-white/15 shadow-xl">
+            <button onclick="recenterMap()" class="p-2 hover:bg-white/10 active:bg-white/20 rounded-full text-slate-300 hover:text-white transition" title="Center">
+              <i data-lucide="crosshair" class="w-4 h-4"></i>
+            </button>
+            <button onclick="zoomMap(1)" class="p-2 hover:bg-white/10 active:bg-white/20 rounded-full text-slate-300 hover:text-white transition" title="Zoom In">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+            </button>
+            <button onclick="zoomMap(-1)" class="p-2 hover:bg-white/10 active:bg-white/20 rounded-full text-slate-300 hover:text-white transition" title="Zoom Out">
+              <i data-lucide="minus" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- The Leaflet Map Element -->
+        <div id="radarMap" class="w-full flex-1"></div>
+
+        <!-- Floating Bottom Snap Cards Carousel -->
+        <div class="absolute bottom-3 left-0 right-0 z-[400] px-4 pointer-events-none">
+          <div class="pointer-events-auto">
+            <div id="mapCarouselContainer" class="flex items-center gap-3 overflow-x-auto no-scrollbar snap-x-mandatory pb-1">
+              <!-- Dynamically populated cards -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- TAB 4: PROFILE & MANAGER BOT VIEW -->
+      <!-- ========================================================= -->
+      <div id="view-profile" class="hidden px-4 pt-3 space-y-4">
+        <div class="rounded-3xl bg-spotviSurface border border-white/10 p-5 flex items-center gap-4">
+          <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-spotviLime to-emerald-400 p-0.5 shadow-xl">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="User Profile" class="w-full h-full rounded-full object-cover" />
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">Jay Bhoslay</h3>
+            <p class="text-xs text-slate-400">Matchday Radar Supporter • HA9 Fan Club</p>
+            <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-spotviLime/20 text-spotviLime text-[10px] font-mono font-bold">VERIFIED SUPPORTER</span>
+          </div>
+        </div>
+
+        <div class="rounded-3xl bg-spotviCard border border-white/10 p-4 space-y-2">
+          <h4 class="font-bold text-sm text-white flex items-center gap-2">
+            <i data-lucide="message-square" class="w-4 h-4 text-emerald-400"></i>
+            <span>Pub Manager Fast Verification</span>
+          </h4>
+          <p class="text-xs text-slate-300">Are you a pub landlord or bar manager in Harrow or Wembley? Confirm your audio setup via our automated WhatsApp bot in 1 click.</p>
+          <button onclick="openWhatsAppModal()" class="w-full mt-2 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition shadow-lg">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Open WhatsApp Manager Bot</span>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ========================================================= -->
+    <!-- DOCKED BOTTOM NAVIGATION (Spotvi 4-Tab Navigation) -->
+    <!-- ========================================================= -->
+    <nav class="fixed bottom-0 left-0 right-0 z-50 bg-[#0E131F]/95 backdrop-blur-2xl border-t border-white/10 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgba(0,0,0,0.8)]">
+      <div class="max-w-md md:max-w-lg mx-auto grid grid-cols-4 items-center px-3 h-17">
+        
+        <!-- 1. Home (Active: Rounded Lime Green Container with Home Icon) -->
+        <button 
+          onclick="switchTab('home')" 
+          id="navTab-home" 
+          class="flex flex-col items-center justify-center gap-1 active:scale-95 transition"
+        >
+          <!-- Neon Lime Pill Container -->
+          <div id="navPill-home" class="px-4.5 py-1.5 rounded-full bg-spotviLime text-black shadow-[0_0_15px_rgba(216,253,56,0.35)] flex items-center justify-center">
+            <i data-lucide="home" class="w-5 h-5"></i>
+          </div>
+          <span id="navLabel-home" class="text-[10px] font-bold text-spotviLime font-sans tracking-tight">Home</span>
+        </button>
+
+        <!-- 2. Schedule -->
+        <button 
+          onclick="switchTab('schedule')" 
+          id="navTab-schedule" 
+          class="flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white active:scale-95 transition"
+        >
+          <div id="navPill-schedule" class="px-3 py-1.5 rounded-full text-slate-400 flex items-center justify-center">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+          </div>
+          <span id="navLabel-schedule" class="text-[10px] font-medium text-slate-400 font-sans tracking-tight">Schedule</span>
+        </button>
+
+        <!-- 3. Explore (Radar Map) -->
+        <button 
+          onclick="switchTab('explore')" 
+          id="navTab-explore" 
+          class="flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white active:scale-95 transition"
+        >
+          <div id="navPill-explore" class="px-3 py-1.5 rounded-full text-slate-400 flex items-center justify-center">
+            <i data-lucide="compass" class="w-5 h-5"></i>
+          </div>
+          <span id="navLabel-explore" class="text-[10px] font-medium text-slate-400 font-sans tracking-tight">Explore</span>
+        </button>
+
+        <!-- 4. Profile -->
+        <button 
+          onclick="switchTab('profile')" 
+          id="navTab-profile" 
+          class="flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white active:scale-95 transition"
+        >
+          <div id="navPill-profile" class="px-3 py-1.5 rounded-full text-slate-400 flex items-center justify-center">
+            <i data-lucide="user" class="w-5 h-5"></i>
+          </div>
+          <span id="navLabel-profile" class="text-[10px] font-medium text-slate-400 font-sans tracking-tight">Profile</span>
+        </button>
+
+      </div>
+    </nav>
+
+    <!-- MODAL: MATCH DETAILS & SCREENING PUBS -->
+    <div id="matchModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md hidden">
+      <div class="absolute inset-0" onclick="closeMatchModal()"></div>
+      <div class="relative w-full max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-white/15 bg-spotviDark p-5 shadow-2xl z-10 max-h-[85vh] overflow-y-auto no-scrollbar">
+        <div class="w-12 h-1.5 rounded-full bg-slate-700 mx-auto -mt-2 mb-3 sm:hidden"></div>
+
+        <div class="flex items-center justify-between pb-3 border-b border-white/10">
+          <span class="text-xs font-mono font-bold text-spotviLime uppercase" id="modalLeagueBadge">Premier League</span>
+          <button onclick="closeMatchModal()" class="text-slate-400 hover:text-white p-1 rounded-full">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div id="modalMatchContent" class="py-4 space-y-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: MANAGER WHATSAPP WORKFLOW PREVIEW -->
+    <div id="whatsAppModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md hidden">
+      <div class="absolute inset-0" onclick="closeWhatsAppModal()"></div>
+      <div class="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border-t sm:border border-emerald-500/30 bg-[#0B141B] shadow-2xl z-10 overflow-hidden">
+        
+        <div class="bg-[#1F2C34] px-4 py-3 border-b border-emerald-500/20 flex items-center justify-between text-white">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-spotviLime flex items-center justify-center font-black text-black text-xs shadow">
+              RD
+            </div>
+            <div>
+              <div class="flex items-center gap-1.5 font-bold text-sm">
+                <span>Radar Matchday Bot</span>
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-spotviLime"></i>
+              </div>
+              <p class="text-[10px] text-emerald-400 font-mono">Landlord Fast Check-In</p>
+            </div>
+          </div>
+          <button onclick="closeWhatsAppModal()" class="text-slate-400 hover:text-white p-1">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4 flex flex-col gap-3 min-h-[300px] max-h-[50vh] overflow-y-auto text-xs bg-[#0B141B] no-scrollbar">
+          <div class="self-start max-w-[88%] rounded-2xl rounded-tl-sm p-3.5 bg-[#202C33] text-slate-200 shadow border border-white/5 space-y-2">
+            <p class="font-bold text-spotviLime text-[11px]">⚽ MatchDay Screening Verification</p>
+            <p>Good day <strong>Dave (The Torch Wembley)</strong>!</p>
+            <p>Are you broadcasting <strong class="text-white">Man City vs Arsenal</strong> and <strong class="text-white">El Clásico</strong> with guaranteed sound?</p>
+            <p class="text-slate-400 text-[10px]">Tap quick response below:</p>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <button onclick="simulateWhatsAppReply(1)" class="w-full text-left p-3 rounded-2xl bg-emerald-600/25 active:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 flex items-center justify-between group transition">
+              <div>
+                <p class="font-bold text-xs group-hover:text-white">"Reply 1: SOUND ON + BIG PROJECTOR"</p>
+                <p class="text-[10px] text-slate-400">Green radar ping activates immediately</p>
+              </div>
+              <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+            </button>
+
+            <button onclick="simulateWhatsAppReply(2)" class="w-full text-left p-3 rounded-2xl bg-amber-500/15 active:bg-amber-500/30 border border-amber-500/30 text-amber-300 flex items-center justify-between group transition">
+              <div>
+                <p class="font-bold text-xs group-hover:text-white">"Reply 2: SUBTITLES / BGM ONLY"</p>
+                <p class="text-[10px] text-slate-400">Muted video feed</p>
+              </div>
+              <i data-lucide="send" class="w-4 h-4 text-amber-400"></i>
+            </button>
+          </div>
+
+          <div id="simulatedChatHistory" class="space-y-2 pt-2"></div>
+        </div>
+
+        <div class="p-3 bg-[#1F2C34] border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Updates fans in &lt;1 second</span>
+          <button onclick="closeWhatsAppModal()" class="px-4 py-1.5 rounded-full bg-white/10 text-white font-bold">Done</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL: LOCATION HUB SWITCHER -->
+    <div id="locationModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md hidden">
+      <div class="absolute inset-0" onclick="closeLocationModal()"></div>
+      <div class="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border-t sm:border border-white/15 bg-spotviDark p-5 shadow-2xl z-10">
+        <div class="flex items-center justify-between pb-3 border-b border-white/10">
+          <h3 class="font-bold text-white text-base">Select Matchday Corridor</h3>
+          <button onclick="closeLocationModal()" class="text-slate-400 hover:text-white p-1">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 gap-2 mt-4 max-h-[50vh] overflow-y-auto no-scrollbar" id="hubOptionList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toastContainer" class="fixed top-18 right-4 left-4 sm:left-auto sm:right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ========================================================= -->
+    <!-- JAVASCRIPT APP LOGIC -->
+    <!-- ========================================================= -->
+    <script>
+      // 1. DATA MODEL
+      const HUBS = [
+        { id: 'corridor', name: 'Harrow & Wembley Corridor (HA1–HA9)', lat: 51.565, lng: -0.315, zoom: 13 },
+        { id: 'wembley-park', name: 'Wembley Park & Stadium (HA9)', lat: 51.558, lng: -0.282, zoom: 15 },
+        { id: 'harrow-hill', name: 'Harrow-on-the-Hill (HA1)', lat: 51.580, lng: -0.337, zoom: 15 },
+        { id: 'wembley-central', name: 'Wembley Central (HA0)', lat: 51.552, lng: -0.297, zoom: 15 },
+        { id: 'north-harrow', name: 'North Harrow (HA2)', lat: 51.586, lng: -0.362, zoom: 14 }
+      ];
+
+      const MATCHES = [
+        {
+          id: 'arsenal-mancity',
+          league: 'Premier League',
+          teamA: 'Manchester City',
+          teamB: 'Arsenal',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg',
+          score: '1 - 1',
+          status: 'LIVE 68\'',
+          channel: 'Sky Sports Main Event',
+          time: 'Live Now',
+          venues: ['stadium-sports-bar', 'the-torch-wembley', 'the-junction-harrow', 'white-horse-wembley', 'mccaffertys-north-harrow']
+        },
+        {
+          id: 'lakers-celtics',
+          league: 'NBA Basketball',
+          teamA: 'LA Lakers',
+          teamB: 'Boston Celtics',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Los_Angeles_Lakers_logo.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg',
+          score: '78 - 82',
+          status: 'LIVE Q3',
+          channel: 'TNT Sports 2',
+          time: 'Live Now',
+          venues: ['stadium-sports-bar', 'the-torch-wembley']
+        },
+        {
+          id: 'wimbledon-live',
+          league: 'Wimbledon Tennis',
+          teamA: 'Quarter Finals',
+          teamB: 'Centre Court',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/en/b/b8/Wimbledon_logo.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/en/b/b8/Wimbledon_logo.svg',
+          score: 'Set 4',
+          status: 'LIVE SET 4',
+          channel: 'BBC One',
+          time: 'Live Now',
+          venues: ['the-torch-wembley', 'white-horse-wembley', 'the-junction-harrow']
+        },
+        {
+          id: 'real-barcelona',
+          league: 'La Liga • El Clásico',
+          teamA: 'Real Madrid',
+          teamB: 'FC Barcelona',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg',
+          score: 'VS',
+          status: 'Tomorrow, 8:00 PM',
+          channel: 'Premier Sports 1 HD',
+          time: 'Tomorrow, 8:00 PM',
+          venues: ['stadium-sports-bar', 'the-torch-wembley', 'the-junction-harrow', 'white-horse-wembley']
+        },
+        {
+          id: 'chelsea-liverpool',
+          league: 'Premier League',
+          teamA: 'Chelsea',
+          teamB: 'Liverpool',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg',
+          score: 'VS',
+          status: 'Today, 5:30 PM',
+          channel: 'Sky Sports PL',
+          time: 'Today, 5:30 PM',
+          venues: ['stadium-sports-bar', 'the-torch-wembley', 'white-horse-wembley', 'mccaffertys-north-harrow', 'the-belmont-harrow']
+        },
+        {
+          id: 'real-bayern',
+          league: 'Champions League',
+          teamA: 'Real Madrid',
+          teamB: 'Bayern Munich',
+          teamALogo: 'https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg',
+          teamBLogo: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg',
+          score: 'VS',
+          status: 'Tonight, 8:00 PM',
+          channel: 'TNT Sports 1 HD',
+          time: 'Tonight, 8:00 PM',
+          venues: ['stadium-sports-bar', 'the-torch-wembley', 'the-junction-harrow']
+        }
+      ];
+
+      const VENUES = [
+        {
+          id: 'stadium-sports-bar',
+          name: 'Stadium Sports Bar, Wembley',
+          address: 'Wembley Hill Rd, HA9 0WS',
+          lat: 51.5548,
+          lng: -0.2872,
+          distance: '0.4 mi',
+          walk: '8 min',
+          isSoundOn: true,
+          soundStatus: 'SOUND ON',
+          screensCount: 12,
+          hasProjector: true,
+          projectorDesc: '2x 4K Laser Big Projectors in Stadium Hall',
+          fanConfirmations: 28,
+          food: 'Pizza & Wings',
+          phone: '+44 20 8902 1199',
+          mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Stadium+Sports+Bar+Wembley'
+        },
+        {
+          id: 'the-torch-wembley',
+          name: 'The Torch, Wembley',
+          address: '1-5 Bridge Rd, HA9 9HL',
+          lat: 51.5642,
+          lng: -0.2798,
+          distance: '0.6 mi',
+          walk: '12 min',
+          isSoundOn: true,
+          soundStatus: 'SOUND ON',
+          screensCount: 16,
+          hasProjector: true,
+          projectorDesc: '120" High-Lumen Big Screen',
+          fanConfirmations: 19,
+          food: 'Pub Grill & Burgers',
+          phone: '+44 20 8904 5440',
+          mapsUrl: 'https://www.google.com/maps/search/?api=1&query=The+Torch+Bridge+Road+Wembley'
+        },
+        {
+          id: 'the-junction-harrow',
+          name: 'The Junction, Harrow',
+          address: '1 Gayton Rd, HA1 2TY',
+          lat: 51.5791,
+          lng: -0.3344,
+          distance: '1.8 mi',
+          walk: '2 min from Station',
+          isSoundOn: true,
+          soundStatus: 'SOUND ON',
+          screensCount: 8,
+          hasProjector: true,
+          projectorDesc: 'HD Dropdown Projector',
+          fanConfirmations: 15,
+          food: 'Gourmet Burgers',
+          phone: '+44 20 8863 3696',
+          mapsUrl: 'https://www.google.com/maps/search/?api=1&query=The+Junction+Gayton+Rd+Harrow'
+        },
+        {
+          id: 'white-horse-wembley',
+          name: 'The White Horse, Wembley Park',
+          address: '4 Wembley Park Blvd, HA9 0GU',
+          lat: 51.5601,
+          lng: -0.2809,
+          distance: '0.3 mi',
+          walk: '5 min',
+          isSoundOn: true,
+          soundStatus: 'SOUND ON',
+          screensCount: 9,
+          hasProjector: false,
+          projectorDesc: '9x 4K Screens Synchronized',
+          fanConfirmations: 14,
+          food: 'Craft Kitchen',
+          phone: '+44 20 8161 0350',
+          mapsUrl: 'https://www.google.com/maps/search/?api=1&query=The+White+Horse+Wembley+Park'
+        },
+        {
+          id: 'mccaffertys-north-harrow',
+          name: 'McCafferty\'s Bar, North Harrow',
+          address: '381-383 Station Rd, HA2 7TA',
+          lat: 51.5847,
+          lng: -0.3621,
+          distance: '2.3 mi',
+          walk: '4 min from Tube',
+          isSoundOn: true,
+          soundStatus: 'SOUND ON',
+          screensCount: 10,
+          hasProjector: false,
+          projectorDesc: '10x Sony Bravia 4K Displays',
+          fanConfirmations: 22,
+          food: 'Irish Tavern Grub',
+          phone: '+44 20 8868 0707',
+          mapsUrl: 'https://www.google.com/maps/search/?api=1&query=McCaffertys+Bar+North+Harrow'
+        }
+      ];
+
+      // State
+      let activeHub = HUBS[0];
+      let currentTab = 'home';
+      let map = null;
+      let markersMap = {};
+      let activeCategory = 'all';
+
+      // 2. LIFECYCLE
+      window.addEventListener('DOMContentLoaded', () => {
+        renderHomeVenues();
+        renderScheduleList();
+        initHubOptions();
+        lucide.createIcons();
+      });
+
+      // 3. TAB SWITCHING (Accurate Spotvi Bottom Nav styling)
+      function switchTab(tabId) {
+        currentTab = tabId;
+
+        // Hide all views
+        ['home', 'schedule', 'explore', 'profile'].forEach(t => {
+          const el = document.getElementById(`view-${t}`);
+          if (el) el.classList.add('hidden');
+
+          // Reset nav pill styling
+          const pill = document.getElementById(`navPill-${t}`);
+          const label = document.getElementById(`navLabel-${t}`);
+          if (pill) {
+            pill.className = 'px-3 py-1.5 rounded-full text-slate-400 flex items-center justify-center';
+          }
+          if (label) {
+            label.className = 'text-[10px] font-medium text-slate-400 font-sans tracking-tight';
+          }
+        });
+
+        // Show active view
+        const activeView = document.getElementById(`view-${tabId}`);
+        if (activeView) activeView.classList.remove('hidden');
+
+        // Apply Spotvi Lime Pill to active tab
+        const activePill = document.getElementById(`navPill-${tabId}`);
+        const activeLabel = document.getElementById(`navLabel-${tabId}`);
+        if (activePill) {
+          activePill.className = 'px-4.5 py-1.5 rounded-full bg-spotviLime text-black shadow-[0_0_15px_rgba(216,253,56,0.35)] flex items-center justify-center';
+        }
+        if (activeLabel) {
+          activeLabel.className = 'text-[10px] font-bold text-spotviLime font-sans tracking-tight';
+        }
+
+        if (tabId === 'explore') {
+          if (!map) {
+            initLeafletMap();
+          } else {
+            setTimeout(() => {
+              map.invalidateSize();
+              recenterMap();
+            }, 100);
+          }
+          renderMapCarousel();
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        lucide.createIcons();
+      }
+
+      // 4. LEAFLET MAP LOGIC
+      function initLeafletMap() {
+        const el = document.getElementById('radarMap');
+        if (!el) return;
+
+        map = L.map('radarMap', {
+          center: [activeHub.lat, activeHub.lng],
+          zoom: activeHub.zoom,
+          zoomControl: false,
+          attributionControl: false
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          subdomains: 'abcd',
+          maxZoom: 19
+        }).addTo(map);
+
+        // Add Wembley Stadium landmark
+        const stadiumIcon = L.divIcon({
+          className: 'custom-landmark-icon',
+          html: `<div class="px-2 py-0.5 rounded-lg bg-spotviLime text-black text-[9px] font-mono font-bold shadow-lg flex items-center gap-1">
+                  <span>🏟️</span><span>WEMBLEY STADIUM</span>
+                 </div>`,
+          iconSize: [110, 20],
+          iconAnchor: [55, 10]
+        });
+        L.marker([51.556, -0.2795], { icon: stadiumIcon }).addTo(map);
+
+        updateMapMarkers();
+        setTimeout(() => map.invalidateSize(), 200);
+      }
+
+      function updateMapMarkers() {
+        if (!map) return;
+        Object.values(markersMap).forEach(m => map.removeLayer(m));
+        markersMap = {};
+
+        VENUES.forEach(venue => {
+          const markerHtml = `
+            <div class="radar-marker-container" onclick="handleMapMarkerTap('${venue.id}')">
+              <div class="radar-pulse-ring"></div>
+              <div class="radar-pin-dot">🔊</div>
+            </div>
+          `;
+
+          const customIcon = L.divIcon({
+            className: 'custom-radar-icon',
+            html: markerHtml,
+            iconSize: [38, 38],
+            iconAnchor: [19, 19]
+          });
+
+          const marker = L.marker([venue.lat, venue.lng], { icon: customIcon }).addTo(map);
+          markersMap[venue.id] = marker;
+        });
+
+        renderMapCarousel();
+      }
+
+      function handleMapMarkerTap(venueId) {
+        const venue = VENUES.find(v => v.id === venueId);
+        if (venue && map) {
+          map.flyTo([venue.lat - 0.002, venue.lng], 16, { animate: true, duration: 0.8 });
+        }
+        const card = document.getElementById(`carousel-card-${venueId}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }
+
+      function renderMapCarousel() {
+        const container = document.getElementById('mapCarouselContainer');
+        if (!container) return;
+
+        let html = '';
+        VENUES.forEach(venue => {
+          html += `
+            <div 
+              id="carousel-card-${venue.id}"
+              onclick="focusMapVenue('${venue.id}')"
+              class="snap-card shrink-0 w-[275px] sm:w-[300px] rounded-3xl bg-spotviSurface/95 backdrop-blur-xl border border-spotviLime/40 p-4 shadow-2xl flex flex-col gap-2"
+            >
+              <div class="flex items-start justify-between">
+                <div>
+                  <span class="px-2 py-0.5 rounded-full bg-spotviLime/20 text-spotviLime text-[10px] font-mono font-bold">
+                    ${venue.soundStatus}
+                  </span>
+                  <h4 class="font-bold text-sm text-white pt-1 truncate">${venue.name}</h4>
+                  <p class="text-[11px] text-slate-400">${venue.distance} • ${venue.walk}</p>
+                </div>
+                <button onclick="event.stopPropagation(); confirmSoundOn('${venue.id}')" class="px-2.5 py-1 rounded-full bg-spotviLime text-black font-bold text-xs">
+                  +1
+                </button>
+              </div>
+
+              <div class="text-[11px] text-slate-300 font-mono">
+                <span>📺 ${venue.screensCount} Screens</span>
+                ${venue.hasProjector ? ' • <span>📽️ Big Projector</span>' : ''}
+              </div>
+
+              <div class="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                <a href="${venue.mapsUrl}" target="_blank" rel="noopener noreferrer" class="text-spotviLime font-semibold flex items-center gap-1">
+                  <i data-lucide="navigation" class="w-3 h-3"></i>
+                  <span>Directions</span>
+                </a>
+                <a href="tel:${venue.phone}" class="text-slate-300 hover:text-white flex items-center gap-1">
+                  <i data-lucide="phone" class="w-3 h-3 text-emerald-400"></i>
+                  <span>Call Pub</span>
+                </a>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+        lucide.createIcons();
+      }
+
+      function focusMapVenue(venueId) {
+        handleMapMarkerTap(venueId);
+      }
+
+      function recenterMap() {
+        if (!map) return;
+        map.flyTo([activeHub.lat, activeHub.lng], activeHub.zoom, { animate: true, duration: 0.8 });
+      }
+
+      function zoomMap(delta) {
+        if (!map) return;
+        if (delta > 0) map.zoomIn();
+        else map.zoomOut();
+      }
+
+      // 5. HOME VENUES FEED
+      function renderHomeVenues() {
+        const container = document.getElementById('homeVenueFeed');
+        if (!container) return;
+
+        let html = '';
+        VENUES.forEach(venue => {
+          html += `
+            <div class="rounded-3xl bg-spotviCard border border-white/10 p-4 shadow-lg flex flex-col gap-3">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-spotviLime/20 text-spotviLime border border-spotviLime/30 text-[10px] font-mono font-bold">
+                      ${venue.soundStatus}
+                    </span>
+                    <span class="text-xs font-mono text-slate-400">${venue.distance} • ${venue.walk}</span>
+                  </div>
+                  <h4 class="font-bold text-base text-white pt-1">${venue.name}</h4>
+                  <p class="text-xs text-slate-400">${venue.address}</p>
+                </div>
+                
+                <button onclick="confirmSoundOn('${venue.id}')" class="px-3 py-1.5 rounded-full bg-spotviLime/15 hover:bg-spotviLime/25 text-spotviLime font-mono font-bold text-xs flex items-center gap-1 border border-spotviLime/30 active:scale-95 transition">
+                  <i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i>
+                  <span id="vote-${venue.id}">${venue.fanConfirmations}</span>
+                </button>
+              </div>
+
+              <div class="p-2.5 rounded-2xl bg-black/40 border border-white/5 text-xs text-slate-300 flex items-center justify-between font-mono">
+                <span>📺 ${venue.screensCount} High-Def Displays</span>
+                <span class="text-spotviLime">${venue.hasProjector ? '📽️ Big Projector ON' : '🔊 Clear PA Commentary'}</span>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-xs text-slate-400">🍴 ${venue.food}</span>
+                <div class="flex items-center gap-2">
+                  <a href="${venue.mapsUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold flex items-center gap-1">
+                    <i data-lucide="navigation" class="w-3 h-3 text-spotviLime"></i>
+                    <span>Maps</span>
+                  </a>
+                  <a href="tel:${venue.phone}" class="p-2 rounded-full bg-white/10 text-emerald-400">
+                    <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+        lucide.createIcons();
+      }
+
+      function renderScheduleList() {
+        const container = document.getElementById('scheduleFullList');
+        if (!container) return;
+
+        let html = '';
+        MATCHES.forEach(m => {
+          html += `
+            <div onclick="openMatchModal('${m.id}')" class="rounded-3xl bg-spotviCard border border-white/10 p-4 shadow-lg active:scale-98 transition flex items-center justify-between gap-3 cursor-pointer">
+              <div class="flex items-center gap-3">
+                <div class="flex items-center -space-x-3 shrink-0">
+                  <div class="w-11 h-11 rounded-full bg-[#18233C] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img src="${m.teamALogo}" alt="${m.teamA}" class="w-8 h-8 object-contain" />
+                  </div>
+                  <div class="w-11 h-11 rounded-full bg-[#291823] border-2 border-[#121A2E] p-1.5 flex items-center justify-center shadow">
+                    <img src="${m.teamBLogo}" alt="${m.teamB}" class="w-8 h-8 object-contain" />
+                  </div>
+                </div>
+                <div>
+                  <span class="text-[10px] font-mono text-spotviLime uppercase font-semibold">${m.league}</span>
+                  <h4 class="font-bold text-sm text-white">${m.teamA} vs ${m.teamB}</h4>
+                  <p class="text-xs text-slate-400">${m.channel} • ${m.status}</p>
+                </div>
+              </div>
+
+              <div class="text-right shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono font-bold text-white block">
+                  ${m.score}
+                </span>
+                <span class="text-[10px] text-spotviLime font-semibold mt-1 block">${m.venues.length} HA Pubs</span>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+        lucide.createIcons();
+      }
+
+      // 6. MATCH DETAIL MODAL
+      function openMatchModal(matchId) {
+        const match = MATCHES.find(m => m.id === matchId);
+        if (!match) return;
+
+        const modal = document.getElementById('matchModal');
+        const badge = document.getElementById('modalLeagueBadge');
+        const content = document.getElementById('modalMatchContent');
+
+        if (badge) badge.innerText = match.league;
+
+        const pubsList = VENUES.filter(v => match.venues.includes(v.id)).map(v => `
+          <div class="p-3 rounded-2xl bg-spotviCard border border-white/10 flex items-center justify-between">
+            <div>
+              <p class="font-bold text-xs text-white">${v.name}</p>
+              <p class="text-[11px] text-slate-400 font-mono">${v.distance} • ${v.soundStatus} • ${v.screensCount} Screens</p>
+            </div>
+            <a href="${v.mapsUrl}" target="_blank" rel="noopener noreferrer" class="px-3 py-1 rounded-full bg-spotviLime text-black font-bold text-[11px]">
+              Go &rarr;
+            </a>
+          </div>
+        `).join('');
+
+        content.innerHTML = `
+          <!-- Match Header Card -->
+          <div class="rounded-3xl bg-spotviSurface border border-white/10 p-5 flex items-center justify-around text-center">
+            <div class="flex flex-col items-center gap-2">
+              <div class="w-16 h-16 rounded-full bg-black/40 p-2 flex items-center justify-center border border-white/10 shadow-lg">
+                <img src="${match.teamALogo}" alt="${match.teamA}" class="w-12 h-12 object-contain" />
+              </div>
+              <span class="font-bold text-xs text-white">${match.teamA}</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-xl font-mono font-black text-spotviLime">${match.score}</span>
+              <span class="px-2 py-0.5 rounded-full bg-spotviRed text-white text-[9px] font-mono font-bold">${match.status}</span>
+              <span class="text-[10px] text-slate-400 pt-1">${match.channel}</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2">
+              <div class="w-16 h-16 rounded-full bg-black/40 p-2 flex items-center justify-center border border-white/10 shadow-lg">
+                <img src="${match.teamBLogo}" alt="${match.teamB}" class="w-12 h-12 object-contain" />
+              </div>
+              <span class="font-bold text-xs text-white">${match.teamB}</span>
+            </div>
+          </div>
+
+          <!-- Harrow & Wembley Screening Venues -->
+          <div class="space-y-2 pt-2">
+            <h4 class="font-bold text-xs text-white flex items-center gap-1.5">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-spotviLime"></i>
+              <span>Screening Venues in Harrow & Wembley Corridor</span>
+            </h4>
+            <div class="space-y-2">
+              ${pubsList}
+            </div>
+          </div>
+        `;
+
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+      }
+
+      function closeMatchModal() {
+        const modal = document.getElementById('matchModal');
+        if (modal) modal.classList.add('hidden');
+      }
+
+      // 7. LOCATION MODAL
+      function initHubOptions() {
+        const container = document.getElementById('hubOptionList');
+        if (!container) return;
+
+        let html = '';
+        HUBS.forEach(h => {
+          const isActive = h.id === activeHub.id;
+          html += `
+            <button onclick="selectHub('${h.id}')" class="w-full text-left p-3.5 rounded-2xl border ${isActive ? 'border-spotviLime bg-spotviLime/15 text-white' : 'border-white/10 bg-spotviSurface text-slate-300'} flex items-center justify-between">
+              <span class="font-bold text-xs ${isActive ? 'text-spotviLime' : 'text-white'}">${h.name}</span>
+              ${isActive ? '<span class="text-xs font-mono font-bold text-spotviLime">ACTIVE</span>' : ''}
+            </button>
+          `;
+        });
+        container.innerHTML = html;
+      }
+
+      function openLocationModal() {
+        const modal = document.getElementById('locationModal');
+        if (modal) modal.classList.remove('hidden');
+        initHubOptions();
+      }
+
+      function closeLocationModal() {
+        const modal = document.getElementById('locationModal');
+        if (modal) modal.classList.add('hidden');
+      }
+
+      function selectHub(hubId) {
+        const hub = HUBS.find(h => h.id === hubId);
+        if (!hub) return;
+        activeHub = hub;
+        document.getElementById('currentHubLabel').innerText = hub.name.split(' (')[0].replace('Harrow & Wembley Corridor', 'HA1–HA9');
+        closeLocationModal();
+        if (map) {
+          map.flyTo([hub.lat, hub.lng], hub.zoom, { animate: true, duration: 0.8 });
+        }
+        showToast(`Corridor switched to ${hub.name}`);
+      }
+
+      // 8. MANAGER WHATSAPP BOT MODAL
+      function openWhatsAppModal() {
+        const modal = document.getElementById('whatsAppModal');
+        if (modal) modal.classList.remove('hidden');
+        lucide.createIcons();
+      }
+
+      function closeWhatsAppModal() {
+        const modal = document.getElementById('whatsAppModal');
+        if (modal) modal.classList.add('hidden');
+      }
+
+      function simulateWhatsAppReply(opt) {
+        const hist = document.getElementById('simulatedChatHistory');
+        if (!hist) return;
+
+        const replyBubble = document.createElement('div');
+        replyBubble.className = 'self-end max-w-[80%] rounded-2xl p-2.5 bg-[#005C4B] text-white text-xs font-mono ml-auto';
+        replyBubble.innerText = opt === 1 ? '1 SOUND ON + BIG PROJECTOR' : '2 SUBTITLES / BGM ONLY';
+        hist.appendChild(replyBubble);
+
+        setTimeout(() => {
+          const botBubble = document.createElement('div');
+          botBubble.className = 'self-start max-w-[85%] rounded-2xl p-3 bg-[#202C33] text-slate-200 text-xs';
+          botBubble.innerHTML = opt === 1 
+            ? '<strong class="text-spotviLime">Verified!</strong> The Torch Wembley is now highlighted GREEN with live audio telemetry across all fan screens.' 
+            : '<strong class="text-amber-400">Noted!</strong> Marked as subtitles only.';
+          hist.appendChild(botBubble);
+          showToast('⚡ Manager Bot Sync complete!');
+        }, 300);
+      }
+
+      // 9. INTERACTIONS & TOASTS
+      function confirmSoundOn(venueId) {
+        const venue = VENUES.find(v => v.id === venueId);
+        if (!venue) return;
+        venue.fanConfirmations += 1;
+        const el = document.getElementById(`vote-${venueId}`);
+        if (el) el.innerText = venue.fanConfirmations;
+        showToast(`✅ You confirmed Sound ON at ${venue.name}!`);
+      }
+
+      function focusSearch() {
+        const wrapper = document.getElementById('searchBarWrapper');
+        const input = document.getElementById('globalSearchInput');
+        if (wrapper && input) {
+          wrapper.classList.toggle('hidden');
+          if (!wrapper.classList.contains('hidden')) {
+            input.focus();
+          }
+        }
+      }
+
+      function handleSearch(val) {
+        const clearBtn = document.getElementById('clearSearchBtn');
+        if (clearBtn) {
+          if (val.length > 0) clearBtn.classList.remove('hidden');
+          else clearBtn.classList.add('hidden');
+        }
+      }
+
+      function clearSearch() {
+        const input = document.getElementById('globalSearchInput');
+        if (input) input.value = '';
+        const clearBtn = document.getElementById('clearSearchBtn');
+        if (clearBtn) clearBtn.classList.add('hidden');
+      }
+
+      function filterCategory(cat) {
+        activeCategory = cat;
+        showToast(`Category filtered: ${cat.toUpperCase()}`);
+      }
+
+      function openCategorySheet() {
+        showToast('All sport channels available in HA1-HA9');
+      }
+
+      function toggleSidebarMenu() {
+        openWhatsAppModal();
+      }
+
+      function openNotificationsModal() {
+        showToast('🔔 3 matches starting within 2 hours in Harrow & Wembley');
+      }
+
+      function showToast(msg) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-full bg-spotviDark/95 border border-spotviLime text-white text-xs font-semibold shadow-2xl animate-in slide-in-from-top-3 duration-200';
+        toast.innerHTML = `<span class="w-2 h-2 rounded-full bg-spotviLime"></span><span>${msg}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'transition', 'duration-300');
+          setTimeout(() => toast.remove(), 300);
+        }, 2500);
+      }
+    </script>
+  </body>
+</html>
